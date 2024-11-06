@@ -89,5 +89,241 @@ df_filtered_numeric = df.loc[condition, numeric_features]
 categorical_features = df.select_dtypes(include=['object']).columns
 df = pd.concat([df_filtered_numeric, df.loc[condition, categorical_features]], axis=1)
 
+# Normalisasi dan Standardisasi Data
+from sklearn.preprocessing import StandardScaler
 
+# Standardisasi fitur numerik
+scaler = StandardScaler()
+df[numeric_features] = scaler.fit_transform(df[numeric_features])
 
+# Histogram Sebelum Standardisasi
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+sns.histplot(train[numeric_features[3]], kde=True)
+plt.title("Histogram Sebelum Standardisasi")
+
+# Histogram Setelah Standardisasi
+plt.subplot(1, 2, 2)
+sns.histplot(df[numeric_features[3]], kde=True)
+plt.title("Histogram Setelah Standardisasi")
+
+# Mengidentifikasi baris duplikat
+duplicated = df.duplicated()
+print("Baris duplikat:")
+print(df[duplicated])
+
+# Menghapus baris duplikat
+df = df.drop_duplicates()
+print("DataFrame setelah menghapus duplikat:")
+print(df)
+
+category_features = df.select_dtypes(include=['object']).columns
+df[category_features]
+
+# One Hot Encoding
+df_one_hot = pd.get_dummies(df, columns=category_features)
+df_one_hot
+
+# Label Encoding
+from sklearn.preprocessing import LabelEncoder
+
+# Inisialisasi LabelEncoder
+label_encoder = LabelEncoder()
+df_lencoder = pd.DataFrame(df)
+
+for col in categorical_features:
+    df_lencoder[col] = label_encoder.fit_transform(df[col])
+
+# Menampilkan hasil
+df_lencoder
+
+# Exploratory dan Explanatory Data Analysis
+
+df_lencoder.head()
+
+# Menghitung jumlah dan persentase missing values di setiap kolom
+missing_values = df_lencoder.isnull().sum()
+missing_percentage = (missing_values / len(df_lencoder)) * 100
+
+missing_data = pd.DataFrame({
+    'Missing Values': missing_values,
+    'Percentage': missing_percentage
+}).sort_values(by='Missing Values', ascending=False)
+
+# Menampilkan kolom dengan missing values
+missing_data[missing_data['Missing Values'] > 0] 
+
+# Menghitung jumlah variabel
+num_vars = df_lencoder.shape[1]
+
+# Menentukan jumlah baris dan kolom untuk grid subplot
+n_cols = 4 # Jumlah kolom yang diinginkan
+n_rows = -(-num_vars // n_cols) # Ceiling division untuk jumlah baris
+
+# Membuat subplot
+fig, axes = plt.subplots(n_rows, n_cols, figsize=(20, n_rows * 4))
+
+# Flatten axes array untuk memudahkan iterasi jika diperlukan
+axes = axes.flatten()
+
+# Plot setiap variabel 
+for i, column in enumerate(df_lencoder.columns):
+    df_lencoder[column].hist(ax=axes[i], bins=20, edgecolor='black')
+    axes[i].set_title(column)
+    axes[i].set_xlabel('Value')
+    axes[i].set_ylabel('Frequency')
+
+# Menghapus subplot yang tidak terpakai (jika ada)
+for j in range(i + 1, len(axes)):
+    fig.delaxes(axes[j])
+
+# Menyesuaikan layout agar lebih rapi
+plt.tight_layout()
+plt.show()
+
+# Visualisasi distribusi data untuk beberapa kolom
+columns_to_plot = ['OverallQual', 'YearBuilt', 'LotArea', 'SaleType', 'SaleCondition']
+
+plt.figure(igsize=(15, 10))
+for i, column in enumerate(columns_to_plot, 1):
+    plt.subplot(2, 3, i)
+    sns.histplot(df_lencoder[column], kde=True, bins=30)
+    plt.title(f'Distribution of {column}')
+
+plt.tight_layout()
+plt.show()
+
+# Visualisasi korelasi antar variabel numerik
+plt.figure(figsize=(12, 10))
+correlation_matrix = df_lencoder.corr()
+
+sns.heatmap(correlation_matrix, annot=False, cmap='coolwarm', vmin=-1, vmax=1)
+plt.title('Correlation Matrix')
+plt.show()
+
+# Menghitung korelasi antara variabel target dan semua variabel lainnya
+target_corr = df_lencoder.corr()['SalePrice']
+
+# (Opsional) Mengurutkan hasil korelasi berdasarkan korelasi
+target_corr_sorted = target_corr.abs().sort_values(ascending=False)
+
+plt.figure(figsize=(10, 6))
+target_corr_sorted.plot(kind='bar')
+plt.title(f'Correlation with SalePrice')
+plt.xlabel('Variables')
+plt.ylabel('Correlation Coefficient')
+plt.show()
+
+# Data Splitting
+
+# Memisahkan fitur (X) dan target (y)
+X = df_lencoder.drop(columns=['SalePrice'])
+y = df_lencoder['SalePrice']
+
+from sklearn.model_selection import train_test_split
+
+# membagi dataset menjadi training dan testing
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
+
+# menghitung panjang/jumlah data
+print("Jumlah data: ", len(X))
+# menghitung panjang/jumlah data pada x_train
+print("Jumlah data latih: ", len(x_train))
+# menghitung panjang/jumlah data pada x_test
+print("Jumlah data test: ", len(x_test))
+
+# Melatih Model (Training)
+
+from sklearn import linear_model
+# Melatih model 1 dengan algoritma Least Angle Regression
+lars = linear_model.Lars(n_nonzero_coefs=1).fit(x_train, y_train)
+
+# Melatih model 2 dengan algoritma Linear Regression
+from sklearn.linear_model import LinearRegression
+LR = LinearRegression().fit(x_train, y_train)
+
+# Melatih model 3 dengan algoritma Gradient Boosting Regressor
+from sklearn.ensemble import GradientBoostingRegressor
+GBR = GradientBoostingRegressor(random_state=183)
+GBR.fit(x_train, y_train)
+
+# Evaluasi Model 
+
+# Evaluasi pada model LARS
+from sklearn.linear_model import Lars
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+pred_lars = lars.predict(x_test)
+mae_lars = mean_absolute_error(y_test, pred_lars)
+mse_lars = mean_squared_error(y_test, pred_lars)
+r2_lars = r2_score(y_test, pred_lars)
+
+# Membuat dictionary untuk menyimpan hasil evaluasi
+data = {
+    'MAE': [mae_lars],
+    'MSE': [mse_lars],
+    'R2': [r2_lars]
+}
+
+# Konversi dictionary menjadi DataFrame
+df_results = pd.DataFrame(data, index=['Lars'])
+df_results
+
+# Evaluasi pada model Linear Regression
+pred_LR = LR.predict(x_test)
+mae_LR = mean_absolute_error(y_test, pred_LR)
+mse_LR = mean_squared_error(y_test, pred_LR)
+r2_LR = r2_score(y_test, pred_LR)
+
+# Menambahkan hasil evaluasi LR ke DataFrame
+df_results.loc['Linear Regression'] = [mae_LR, mse_LR, r2_LR]
+df_results
+
+# Evaluasi pada model Linear Regression
+pred_GBR = GBR.predict(x_test)
+mae_GBR = mean_absolute_error(y_test, pred_GBR)
+mse_GBR = mean_squared_error(y_test, pred_GBR)
+r2_GBR = r2_score(y_test, pred_GBR)
+ 
+# Menambahkan hasil evaluasi LR ke DataFrame
+df_results.loc['GradientBoostingRegressor'] = [mae_GBR, mse_GBR, r2_GBR]
+df_results
+
+# Menyimpan Model
+
+import joblib
+ 
+# Menyimpan model ke dalam file
+joblib.dump(GBR, 'gbr_model.joblib')
+
+import pickle
+ 
+# Menyimpan model ke dalam file
+with open('gbr_model.pkl', 'wb') as file:
+    pickle.dump(GBR, file)
+
+# Deployment dan Monitoring
+
+# Memuat model dari file joblib
+joblib_model = joblib.load('gbr_model.joblib')
+ 
+# Memuat model dari file pickle
+with open('gbr_model.pkl', 'rb') as file:
+    pickle_model = pickle.load(file)
+
+from flask import Flask, request, jsonify
+import joblib
+ 
+# Inisialisasi aplikasi Flask
+app = Flask(__name__)
+ 
+# Memuat model yang telah disimpan
+joblib_model = joblib.load('gbr_model.joblib') # Pastikan path file sesuai dengan penyimpanan Anda
+ 
+@app.route('/predict', methods=['POST'])
+def predict():
+    data = request.json['data']  # Mengambil data dari request JSON
+    prediction = joblib_model.predict(data)  # Melakukan prediksi (harus dalam bentuk 2D array)
+    return jsonify({'prediction': prediction.tolist()})
+ 
+if name == '__main__':
+    app.run(debug=True)
